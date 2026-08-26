@@ -7,7 +7,8 @@ Unlike a scripted "bad actor" walkthrough, nothing in the [main incident report]
 
 ## 🏗️ Architecture
 
-![Honeypot architecture: internet → NSG → Windows 11 VM (MySQL + weak accounts) → MySQL log file → Azure Monitor Agent → Log Analytics + Microsoft Defender for Endpoint](scenario-creation-images/01-honeypot-architecture.png)
+<img width="1536" height="1024" alt="01-honeypot-architecture" src="https://github.com/user-attachments/assets/bdc4f71a-26dc-4ef2-89ce-bcf321e71568" />
+
 
 - A Windows 11 VM sits behind a Network Security Group, with a MySQL 8.0 server running locally on port 3306.
 - MySQL's general query log writes every connection and query to `mysql_general.log`.
@@ -18,13 +19,12 @@ Unlike a scripted "bad actor" walkthrough, nothing in the [main incident report]
 
 ## 🔧 Build Process
 
-### Phase 0 — Design
-Planned around a *contained* breach: inbound attacker traffic is allowed to succeed, but outbound abuse (C2, mining, pivoting) is blocked and logged rather than allowed through. Detections were planned around **denied/attempted outbound**, not successful exfiltration.
-
 ### Phase 1 — Build the VM (locked down)
 - Deployed a Windows 11 VM with a public IP, named to look like a legitimate corporate asset rather than an obvious lab box.
 - Denied all inbound internet traffic while the environment was still being built.
 - Onboarded the VM to Microsoft Defender for Endpoint and confirmed it appeared in the `DeviceInfo` table.
+<img width="2894" height="1742" alt="Screenshot 2026-08-11 161936" src="https://github.com/user-attachments/assets/e286cc7a-25c9-4566-9e25-473168e12f6e" />
+
 
 ### Phase 2 — Install & populate MySQL
 - Installed MySQL 8.0 Server with a strong root password (temporary — this gets deliberately weakened later).
@@ -37,47 +37,90 @@ Planned around a *contained* breach: inbound attacker traffic is allowed to succ
   ```
 - Pointed the log output at a known file path and confirmed test queries were landing in the log.
 
+
 ### Phase 3 — Wire logging to Log Analytics
 - Created a custom-text-log Data Collection Rule (DCR) pointing the Azure Monitor Agent at the MySQL log file, landing everything in a custom table: `MySQLAudit_CL`.
-
-  ![DCR data source configuration — file pattern, table name, record delimiter, and timestamp format](scenario-creation-images/02-dcr-mysql-log-config.png)
-
-  ![DCR destination set to the Log Analytics Workspace](scenario-creation-images/03-dcr-destination-law.png)
-
 - Confirmed the Azure Monitor Agent extension installed successfully on the VM.
-
-  ![AzureMonitorWindowsAgent extension showing as installed on the VM](scenario-creation-images/04-azure-monitor-agent-extension.png)
-
 - Verified ingestion by running test connections/queries against MySQL and confirming they showed up in `MySQLAudit_CL`, filtered to this VM's resource ID.
+<img width="2452" height="1714" alt="Logs-coming-In" src="https://github.com/user-attachments/assets/199e9f74-2c93-4bbd-8479-c5425b72e513" />
 
-  ![Query results confirming MySQLAudit_CL is receiving this VM's log data](scenario-creation-images/05-verify-mysqlaudit-ingestion.png)
 
 ### Phase 4 — Write detections (while the box was still clean)
 Before any exposure, two Sentinel analytics rules were authored and confirmed *quiet* against the clean baseline — no real successes yet.
 
 **Rule 1 — successful logon to the VM** (`DeviceLogonEvents`, `administrator`/`guest`, `LogonSuccess`):
-![Entity mapping and analytics rule settings for the VM logon detection](scenario-creation-images/06-analytics-rule-vm-logon.png)
+```kql
+// Virtual Machine Logons
+let MyDevice = "ent-fl-123ds"; // MDE Truncates/cuts off the device name
+DeviceLogonEvents
+| where DeviceName == MyDevice
+| where AccountName in~ ("administrator", "guest")
+| where ActionType == "LogonSuccess"
+| project TimeGenerated, RemoteIP, AccountName, DeviceName, ActionType, LogonType
+```
 
 **Rule 2 — successful login to MySQL** (`MySQLAudit_CL`, parsed connect/auth-success events — the same parsing pattern used throughout the incident report):
-![Entity mapping and analytics rule settings for the MySQL logon detection](scenario-creation-images/07-analytics-rule-mysql-logon.png)
+```kql
+Rule query:
+// SQL Server
+let MyDevice = "ent-fl-123ds";
+let FailedConnections =
+MySQLAudit_CL
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend DeviceName = tostring(split(_ResourceId, "/")[-1])
+| where DeviceName == MyDevice
+| where RawData has "Access denied"
+| extend ConnectionId = extract(@"^\S+\s+(\d+)\s+Connect", 1, RawData)
+| distinct ConnectionId;
+MySQLAudit_CL
+| where TimeGenerated > MyTimeframe
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend DeviceName = tostring(split(_ResourceId, "/")[-1])
+| where DeviceName == MyDevice
+| where RawData has "Connect"
+| extend ConnectionId = extract(@"^\S+\s+(\d+)\s+Connect", 1, RawData)
+| extend ActionType =
+    case(
+        RawData has "Access denied", "LogonFailure",
+        ConnectionId in (FailedConnections), "Ignore",
+        "LogonSuccess"
+    )
+| where ActionType != "Ignore"
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend Username = replace_string(tostring(split(tostring(split(RawData,"@")[0]), " ")[-1]), "'", "")
+| extend IpAddress = replace_string(tostring(split(split(RawData,"@")[1], " ")[0]), "'", "")
+| where ActionType == "LogonSuccess"
+| project TimeGenerated, DeviceName, Username, IpAddress, ActionType, RawData
+| order by TimeGenerated desc
+```
+
 
 ### Phase 5 — Weaken & expose (deliberately, in sequence)
 Only after both detections were armed:
 1. Enabled the local `administrator` account with a deliberately weak password.
+<img width="2679" height="1715" alt="weakVM-1" src="https://github.com/user-attachments/assets/c901c9ad-c7b7-4fb0-b584-0dddb5a882b6" />
+
 2. Enabled the `guest` account with a blank/weak password and allowed it to log on over the network via RDP.
 3. Exposed MySQL to the network and created a wide-open `root@'%'` account with a trivially weak password.
+   <img width="2763" height="1718" alt="weakVM-2 5" src="https://github.com/user-attachments/assets/4d8c2d48-b45f-4818-8d52-ce7577e7b035" />
+
 4. Captured a baseline Defender investigation package (for later comparison against post-breach).
 5. Disabled the Windows Firewall and widened the NSG to allow all inbound traffic.
 6. **Recorded the exact exposure timestamp** — this becomes the start of the incident window in the report.
 
+
 ### Phase 6 — Detect the breach
 With detections armed and the box exposed, monitored `DeviceLogonEvents` and `MySQLAudit_CL` for the analytics rules to fire, using the same rule queries as ad-hoc monitoring queries.
+<img width="2710" height="1760" alt="detect-1" src="https://github.com/user-attachments/assets/647b8003-df29-46a8-b10b-fecc6074b3fd" />
+
 
 ### Phase 7 — Analyze the breach
 Once real attacker activity started appearing (in this case, within hours), the investigation shifted to log analysis — the exact process documented in the [incident report](../README.md): tracing authentication logs, query logs, and Defender telemetry to reconstruct what happened.
 
+
 ### Phase 8 — Contain the breach
 Isolated the VM in the Defender portal and captured a second investigation package, for comparison against the Phase 5 baseline. **Recorded the exact isolation timestamp** — this closes the incident window.
+
 
 ### Phase 9 — Eradicate & recover
 Since both the VM and the MySQL server were compromised, the environment was rebuilt clean rather than trusted going forward: hardened NSG rules, no `administrator` account, `guest` disabled, no public MySQL access, strong credentials, and the database restored from a known-good backup.
@@ -151,20 +194,12 @@ NTANetAnalytics
 ---
 
 ## Created By
-- **Author:** _[Your Name]_
-- **Contact:** _[Your LinkedIn/GitHub]_
+- **Author:** Alfred Acquah
+- **Contact:** https://github.com/alfredacq
 - **Date:** August 2026
 
-## Validated By
-- **Reviewer:**
-- **Contact:**
-- **Validation Date:**
 
 ## Additional Notes
 - This honeypot was built as part of a hands-on cloud/EDR security lab using Microsoft Azure, Microsoft Defender for Endpoint, and Microsoft Sentinel. Unlike a scripted CTF scenario, the attacker activity documented in the [main incident report](../README.md) was **not simulated** — it's real, unsolicited traffic from the public internet against a deliberately exposed decoy.
 - Course reference material for VM/MDE onboarding and MySQL sample-data setup is intentionally omitted here since it links to private/instructor-owned resources.
 
-## Revision History
-| Version | Changes | Date | Modified By |
-|---|---|---|---|
-| 1.0 | Initial draft | August 2026 | _[Your Name]_ |
