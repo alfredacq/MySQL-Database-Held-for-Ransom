@@ -1,4 +1,4 @@
-# Scenario Creation: Building the MySQL Ransom Honeypot
+# Scenario Creation: Building the Honeypot
 **How the `ent-fl-123ds` environment was designed, deployed, and deliberately exposed to real internet attackers** — the incident report at the top level of this repo documents what an actual attacker did once they found it.
 
 Unlike a scripted "bad actor" walkthrough, nothing in the [main incident report](https://github.com/alfredacq/Incident-Report-MySQL-Ransom-Data-Destruction/tree/main) was staged. This VM and database were built clean, wired up to logging and detections *first*, and only then deliberately weakened and exposed — so every IP, timestamp, and query in the incident report is a real, unsolicited attacker interacting with a live decoy.
