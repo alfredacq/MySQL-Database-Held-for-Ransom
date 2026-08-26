@@ -22,7 +22,9 @@
 
 ## 📋 The Scenario
 
-The database team was alerted that a production MySQL database had suddenly become inaccessible. On inspection, all of its tables had been replaced with a single table containing a ransom note. The goal of this investigation was to determine **how the attacker got in, what they did, what data was exposed, and whether the Windows host itself was also compromised** — then contain the incident and recommend fixes.
+The `ent-fl-123ds` virtual machine was a purpose-built honeypot, designed to closely resemble a legitimate corporate server. Before it was ever exposed to the internet, the environment was fully instrumented with logging and detection rules, so that any activity against it could be captured and analyzed in detail from the very first moment of contact. Once that groundwork was in place, the server was deliberately weakened and made reachable from the public internet. Everything described in this report from that point forward is real, unsolicited attacker activity against that environment — none of it was scripted or staged. You can see exactly how it was designed and built in the [Scenario Creation](https://github.com/alfredacq/Incident-Report-MySQL-Ransom-Data-Destruction/tree/main/scenarion_creation.md).
+
+Shortly after exposure, all of the MySQL databases on the server were found to have been replaced with a single table containing a ransom note. This investigation set out to determine who discovered the environment, how they gained access, what actions they took, what data they interacted with, and whether the Windows host itself was also probed or compromised — then to walk through containment and recovery.
 
 ### High-Level Investigation Plan
 - **Check `MySQLAudit_CL`** for the account/privilege change that opened the database to the internet, and for the destructive queries that followed.
@@ -244,3 +246,12 @@ The database was directly reachable from the internet, and a `root` account with
 
 ---
 
+## 📝 Summary
+
+The Windows 11 computer (ent-fl-123ds) was purposely built to get attacked. It was set up to look like an ordinary corporate server, wired with full endpoint and database logging plus armed detection rules, then deliberately weakened — a wide-open `root` account, a weak Windows admin password, an open firewall — and put on the public internet. From that point on, everything documented in this report is genuine, unsolicited attacker behavior.
+
+The decoy didn't stay quiet for long. Within about five hours of exposure, an opportunistic scanner found the open database, read through several tables — including one named `credentials` — and wiped every database, replacing them with a ransom note. Over the next four days, at least 11 more independent IP addresses found the same opening and left copies of the same note, consistent with automated internet-wide extortion bots rather than one persistent human attacker. In parallel, dozens of unrelated IPs hammered the Windows host's local admin account, which is normal background noise for anything left open on the internet.
+
+Nothing here involved a clever exploit, custom malware, or a skilled adversary — the entire chain traces back to one misconfiguration (a `root` account reachable from any host) discovered by automated scanning within hours. That's arguably the most useful finding of the exercise: it didn't take a sophisticated attacker to cause real damage; it took an open door.
+
+This project exercised the full incident-response lifecycle end to end — designing and building a monitored decoy, arming detections *before* exposure, investigating a live, unscripted breach across MySQL audit logs and Microsoft Defender for Endpoint telemetry, correlating IOCs across data sources, and documenting containment, eradication, and recovery steps a real SOC would take. See [Scenario Creation](https://github.com/alfredacq/Incident-Report-MySQL-Ransom-Data-Destruction/tree/main/scenarion_creation.md) for the full build process behind it.
