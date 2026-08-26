@@ -1,7 +1,7 @@
 # Scenario Creation: Building the MySQL Ransom Honeypot
 **How the `ent-fl-123ds` environment was designed, deployed, and deliberately exposed to real internet attackers** — the incident report at the top level of this repo documents what an actual attacker did once they found it.
 
-Unlike a scripted "bad actor" walkthrough, nothing in the [main incident report](../README.md) was staged. This VM and database were built clean, wired up to logging and detections *first*, and only then deliberately weakened and exposed — so every IP, timestamp, and query in the incident report is a real, unsolicited attacker interacting with a live decoy.
+Unlike a scripted "bad actor" walkthrough, nothing in the [main incident report](https://github.com/alfredacq/Incident-Report-MySQL-Ransom-Data-Destruction/tree/main) was staged. This VM and database were built clean, wired up to logging and detections *first*, and only then deliberately weakened and exposed — so every IP, timestamp, and query in the incident report is a real, unsolicited attacker interacting with a live decoy.
 
 ---
 
@@ -115,7 +115,7 @@ With detections armed and the box exposed, monitored `DeviceLogonEvents` and `My
 
 
 ### Phase 7 — Analyze the breach
-Once real attacker activity started appearing (in this case, within hours), the investigation shifted to log analysis — the exact process documented in the [incident report](../README.md): tracing authentication logs, query logs, and Defender telemetry to reconstruct what happened.
+Once real attacker activity started appearing (in this case, within hours), the investigation shifted to log analysis — the exact process documented in the [main incident report](https://github.com/alfredacq/Incident-Report-MySQL-Ransom-Data-Destruction/tree/main): tracing authentication logs, query logs, and Defender telemetry to reconstruct what happened.
 
 
 ### Phase 8 — Contain the breach
@@ -200,6 +200,6 @@ NTANetAnalytics
 
 
 ## Additional Notes
-- This honeypot was built as part of a hands-on cloud/EDR security lab using Microsoft Azure, Microsoft Defender for Endpoint, and Microsoft Sentinel. Unlike a scripted CTF scenario, the attacker activity documented in the [main incident report](../README.md) was **not simulated** — it's real, unsolicited traffic from the public internet against a deliberately exposed decoy.
+- This honeypot was built as part of a hands-on cloud/EDR security lab using Microsoft Azure, Microsoft Defender for Endpoint, and Microsoft Sentinel. Unlike a scripted CTF scenario, the attacker activity documented in the [main incident report](https://github.com/alfredacq/Incident-Report-MySQL-Ransom-Data-Destruction/tree/main) was **not simulated** — it's real, unsolicited traffic from the public internet against a deliberately exposed decoy.
 - Course reference material for VM/MDE onboarding and MySQL sample-data setup is intentionally omitted here since it links to private/instructor-owned resources.
 
