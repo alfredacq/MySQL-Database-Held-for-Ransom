@@ -217,6 +217,23 @@ The database was directly reachable from the internet, and a `root` account with
 
 ---
 
+## 🎯 MITRE ATT&CK Mapping
+
+| Tactic | Technique | Evidence |
+|---|---|---|
+| Initial Access | [T1133 – External Remote Services](https://attack.mitre.org/techniques/T1133/) | MySQL (3306) and RDP/SMB were both reachable from the internet once the firewall/NSG was opened |
+| Initial Access / Credential Access | [T1078 – Valid Accounts](https://attack.mitre.org/techniques/T1078/) | Every successful MySQL connection used a working `root` password rather than exploiting a vulnerability |
+| Credential Access | [T1110.001 – Password Guessing](https://attack.mitre.org/techniques/T1110/001/) | 135 failed logons against `administrator`/`guest` from 49 distinct IPs, 3 apparent successes |
+| Persistence / Privilege Escalation | [T1098 – Account Manipulation](https://attack.mitre.org/techniques/T1098/) | Second attacker wave issued its own `GRANT CREATE, DROP ON *.* TO root@'%'` |
+| Discovery | [T1087 – Account Discovery](https://attack.mitre.org/techniques/T1087/) | `SHOW TABLES` / `SHOW DATABASES` enumeration before any destructive action |
+| Collection | [T1213 – Data from Information Repositories](https://attack.mitre.org/techniques/T1213/) | `SELECT *` against `credentials`, `customers`, `orders`, `payments` |
+| Impact | [T1485 – Data Destruction](https://attack.mitre.org/techniques/T1485/) | Every table in `ent_corp`, `sakila`, and `world` was dropped |
+| Impact | [T1657 – Financial Theft](https://attack.mitre.org/techniques/T1657/) | BTC ransom demand and reference ID left in the `RECOVER_YOUR_DATA` table |
+
+**Notably absent:** [T1486 – Data Encrypted for Impact](https://attack.mitre.org/techniques/T1486/) does not apply — nothing was encrypted, only destroyed. No Execution, Lateral Movement, or Command and Control techniques were observed either; this was a single-stage, credential-driven attack rather than a multi-stage intrusion.
+
+---
+
 ## 🛡️ Response & Fix
 
 **Contained:**
