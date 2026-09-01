@@ -237,6 +237,7 @@ The database was directly reachable from the internet, and a `root` account with
 ## 🛡️ Response & Fix
 
 **Contained:**
+- Isolated the virtual machine.
 - Removed the wide-open `root` account; restricted `root` to local connections only.
 - Blocked internet access to the database port (3306) at the firewall.
 - Rotated all database credentials.
